@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" /><title>Mon 1er jeu Phaser</title>
+    <script
+src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+    <style type="text/css"> body { margin: 0; }</style>
+</head>
+<body>
+<script type="text/javascript">
+    var config = {
+type: Phaser.AUTO,
+width: 1000, height: 800,
+physics: {
+default: 'arcade',
+arcade: {
+gravity: { y: 300 },
+debug: false
+}},
+
+scene: {preload: preload, create: create, update: update }
+};
+new Phaser.Game(config);
+function preload(){
+// chargement tuiles de jeu
+this.load.image("Tileset", "assets/Tileset_first_level.png");
+this.load.image("coin", "assets/carotte.png");
+this.load.image("spike","assets/spike.png")
+// chargement de la carte
+this.load.tilemapTiledJSON("map", "assets/First_Level_03.json");  
+this.load.spritesheet('perso','assets/Track_Anim.png',
+{ frameWidth: 32, frameHeight: 64 });
+}
+
+
+var player;
+var score=0;
+var scoreText;
+var gameOver=false;
+var jump=false;
+var accroD=false;
+var accroG=false
+var walljump=false
+
+
+function create(){
+cursors = this.input.keyboard.createCursorKeys();
+// chargement de la carte
+const carteDuNiveau = this.add.tilemap("map");
+
+// chargement du jeu de tuiles
+const tileset = carteDuNiveau.addTilesetImage(
+          "Tileset",
+          "Tileset"
+        );  
+
+// chargement du calque calque_background
+const calque_background = carteDuNiveau.createLayer(
+          "Background",
+          tileset
+        );
+
+
+
+// chargement du calque calque_plateformes
+const calque_plateformes = carteDuNiveau.createLayer(
+          "Niveau",
+          tileset
+        );  
+const  calque_pique = carteDuNiveau.createLayer(
+          "Spikes",
+          tileset
+);
+
+const  calque_carotte = carteDuNiveau.createLayer(
+          "Carottes",
+          tileset
+);
+// définition des tuiles de plateformes qui sont solides
+// utilisation de la propriété estSolide
+calque_plateformes.setCollisionByProperty({ estSolide:true}); 
+calque_pique.setCollisionByProperty({estSolide:true});
+
+player = this.physics.add.sprite(100, 1170, 'perso');
+player.setBounce(0);
+player.setCollideWorldBounds(true);
+this.physics.add.collider(player, calque_plateformes);
+this.physics.add.collider(player,calque_pique);
+
+this.anims.create({
+key: 'left',
+frames: this.anims.generateFrameNumbers('perso', {start:8,end:5}),
+frameRate: 10,
+repeat: -1
+});
+this.anims.create({
+key: 'turn',
+frames: this.anims.generateFrameNumbers('perso', {start:12,end:13}),
+frameRate: 20,
+repeat:-1
+});
+this.anims.create({
+key: 'right',
+frames: this.anims.generateFrameNumbers('perso', {start:15,end:18}),
+frameRate: 10,
+repeat: -1
+});
+this.anims.create({
+key: 'up',
+frames: this.anims.generateFrameNumbers('perso', {start:20,end:19}),
+frameRate: 10,
+});
+this.anims.create({
+key: 'jump',
+frames: [ { key: 'perso', frame: 20 } ],
+frameRate: 10,
+});
+this.anims.create({
+key: 'accrocheD',
+frames: this.anims.generateFrameNumbers('perso', {start:0,end:1}),
+frameRate: 10,
+repeat:-1,
+});
+this.anims.create({
+key: 'accrocheG',
+frames: this.anims.generateFrameNumbers('perso', {start:22,end:23}),
+frameRate: 10,
+repeat:-1,
+});
+this.anims.create({
+key: 'jumpG',
+frames: [ { key: 'perso', frame: 10 } ],
+frameRate: 10,
+});
+
+// redimentionnement du monde avec les dimensions calculées via tiled
+this.physics.world.setBounds(0, 0, 3200, 3200);
+//  ajout du champs de la caméra de taille identique à celle du monde
+this.cameras.main.setBounds(0, 0, 3200, 3200);
+// ancrage de la caméra sur le joueur
+this.cameras.main.startFollow(player, true);
+this.cameras.main.setZoom(3); 
+}
+
+
+
+function update(){
+
+if (gameOver){return;}
+
+if (cursors.left.isDown){ //si la touche gauche est appuyée
+if(player.body.blocked.down){
+    player.setVelocityY(250);
+    player.setVelocityX(-260); //alors vitesse négative en X
+    player.anims.play('left', true); //et animation => gauche
+}
+else{
+player.setVelocityX(-260); //alors vitesse négative en X
+
+player.anims.play('left', true); //et animation => gauche
+}
+}
+else if (cursors.right.isDown){ //sinon si la touche droite est appuyée
+if(player.body.blocked.down){
+    player.setVelocityY(250);
+    player.setVelocityX(260); //alors vitesse positive en X
+    player.anims.play('right', true); //et animation => droite
+}
+else{
+player.setVelocityX(260); //alors vitesse positive en X
+player.anims.play('right', true); //et animation => droite
+}
+}
+
+else if (jump==false && accroD==false && accroG==false){ // sinon
+player.setVelocityX(0); //vitesse nulle
+player.anims.play('turn'); //animation fait face caméra
+}
+if (cursors.up.isDown && player.body.blocked.down){
+//si touche haut appuyée ET que le perso touche le sol
+player.setVelocityY(-240); //alors vitesse verticale négative
+//(on saute)
+player.anims.play('up');
+jump=true
+setTimeout(() => {
+    jump=false
+},500);
+}
+
+
+
+if (jump==true && player.body.blocked.right){
+    accroD=true
+    player.body.allowGravity=false;
+    
+    player.anims.play('accrocheD',true);
+    player.setVelocityY(0);
+    setTimeout(() => {
+    player.body.allowGravity=true
+    accroD=false
+},2000);      
+}
+
+else if (jump==true && player.body.blocked.left){
+    accroG=true
+    player.anims.play('accrocheG',true);
+    player.setVelocityY(0);
+    player.body.allowGravity=false;
+    setTimeout(() => {
+    accroG=false
+    player.body.allowGravity=true
+},2000);
+}
+
+
+
+if (accroD==true && cursors.up.isDown){
+    accroD=false
+    jump=true
+    player.setVelocityX(-260)
+    player.setVelocityY(-200)
+    accroG=true
+    player.anims.play("jumpG",12)
+    setTimeout(() => {
+    accroG=false
+    jump=false
+    player.setVelocityY(0)
+    player.setVelocityX(0)
+},1000);
+    
+}
+else if (accroG==true && cursors.up.isDown){
+    accroG=false
+    jump=true
+    player.setVelocityX(260)
+    player.setVelocityY(-200)
+    accroD=true
+    player.anims.play('jump',true)
+    setTimeout(() => {
+    accroD=false
+    jump=false
+    player.setVelocityY(0)
+    player.setvelocityX(0)
+},1000);
+}
+
+}
+</script>
+</body>
+</html>
